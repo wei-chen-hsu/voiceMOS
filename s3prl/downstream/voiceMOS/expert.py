@@ -339,7 +339,7 @@ class DownstreamExpert(nn.Module):
                 self.best_scores["dev_SRCC"] = spearman_rho
                 save_names.append(f"{mode}-SRCC-best.ckpt")
                 df = pd.DataFrame(list(zip(records["wav_names"], np.array(records["pred_scores"]))))
-                df.to_csv(Path(kwargs["expdir"], "answer.txt"), header=None, index=None)
+                df.to_csv(Path(self.expdir, "answer.txt"), header=None, index=None)
                 tqdm.write(f"writing answer.txt")
 
         if mode == "test":
