@@ -25,6 +25,7 @@ class DownstreamExpert(nn.Module):
         self.upstream_dim = upstream_dim
         self.datarc = downstream_expert["datarc"]
         self.modelrc = downstream_expert["modelrc"]
+        self.expdir = kwargs["expdir"]
         idtable = Path(kwargs["expdir"]) / "idtable.pkl"
 
         self.train_dataset = VoiceMOSDataset(
@@ -40,11 +41,18 @@ class DownstreamExpert(nn.Module):
             idtable=idtable,
             valid=True,
         )
+        self.test_dataset = VoiceMOSDataset(
+            load_file(self.datarc["voiceMOS_path"], "sets/DEVSET"),
+            load_file(self.datarc["voiceMOS_path"], "sets/val_mos_list.txt"),
+            self.datarc["voiceMOS_path"],
+            idtable=idtable,
+            valid=True,
+        )
 
         self.system_mos = pd.read_csv(
             Path(
                 self.datarc["voiceMOS_path"],
-                "mydata_system.csv",
+                "system_level_mos.csv",
             ),
             index_col=False
         )
@@ -73,8 +81,9 @@ class DownstreamExpert(nn.Module):
     def get_dataloader(self, mode):
         if mode == "train":
             return self._get_train_dataloader(self.train_dataset)
-        elif mode == "dev":
+        elif mode == "dev" or mode == "test":
             return self._get_eval_dataloader(self.dev_dataset)
+
 
 
     def _get_train_dataloader(self, dataset):
@@ -107,6 +116,7 @@ class DownstreamExpert(nn.Module):
         opinion_score_list,
         mos_list,
         segment_judge_ids,
+        wav_name_list,
         records,
         **kwargs,
     ):
@@ -182,6 +192,24 @@ class DownstreamExpert(nn.Module):
             records["pred_scores"] += uttr_scores
             records["true_scores"] += mos_list.detach().cpu().tolist()
 
+            records["wav_names"] += wav_name_list
+
+        if mode == "test":
+            segments_scores = self.model(features)
+
+            for i in range(len(prefix_sums) - 1):
+                current_segment_scores = segments_scores[
+                    prefix_sums[i] : prefix_sums[i + 1]
+                ]
+                uttr_score = current_segment_scores.mean(dim=-1)
+                uttr_scores.append(uttr_score.detach().cpu())
+
+            records["pred_scores"] += uttr_scores
+            records["true_scores"] += mos_list.detach().cpu().tolist()
+
+            records["wav_names"] += wav_name_list
+        
+
 
         if len(records["system"]) == 0:
             records["system"].append(defaultdict(list))
@@ -232,7 +260,7 @@ class DownstreamExpert(nn.Module):
 
         # logging Utterance-level MSE, LCC, SRCC
 
-        if mode == "dev":
+        if mode == "dev" or mode == "test":
             # some evaluation-only processing, eg. decoding
             all_pred_scores = records["pred_scores"]
             all_true_scores = records["true_scores"]
@@ -310,6 +338,15 @@ class DownstreamExpert(nn.Module):
             if spearman_rho > self.best_scores["dev_SRCC"]:
                 self.best_scores["dev_SRCC"] = spearman_rho
                 save_names.append(f"{mode}-SRCC-best.ckpt")
+                df = pd.DataFrame(list(zip(records["wav_names"], np.array(records["pred_scores"]))))
+                df.to_csv(Path(kwargs["expdir"], "answer.txt"), header=None, index=None)
+                tqdm.write(f"writing answer.txt")
+
+        if mode == "test":
+            df = pd.DataFrame(list(zip(records["wav_names"], np.array(records["pred_scores"]))))
+            df.to_csv(Path(self.expdir, "answer.txt"), header=None, index=None)
+            
+
 
         return save_names
 

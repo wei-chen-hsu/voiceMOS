@@ -43,10 +43,10 @@ class VoiceMOSDataset(Dataset):
         wav = wav.view(-1)
         wav_segments = unfold_segments(wav, self.segments_durations)
 
-        return system_name, wav_segments, opinion_score, mos, judge_id
+        return system_name, wav_segments, opinion_score, mos, judge_id, wav_name
 
     def collate_fn(self, samples):
-        system_name_list, wav_segments_list, opinion_score_list, mos_list, judge_id_list = zip(*samples)
+        system_name_list, wav_segments_list, opinion_score_list, mos_list, judge_id_list, wav_name_list = zip(*samples)
         flattened_wavs_segments = [
             wav_segment
             for wav_segments in wav_segments_list
@@ -62,7 +62,8 @@ class VoiceMOSDataset(Dataset):
                 prefix_sums,
                 torch.FloatTensor(opinion_score_list),
                 torch.FloatTensor(mos_list),
-                None
+                None,
+                wav_name_list
             )
             
         segment_judge_ids = []
@@ -75,7 +76,8 @@ class VoiceMOSDataset(Dataset):
             prefix_sums,
             torch.FloatTensor(opinion_score_list),
             torch.FloatTensor(mos_list),
-            torch.LongTensor(segment_judge_ids)
+            torch.LongTensor(segment_judge_ids),
+            wav_name_list
         )
     
     def gen_idtable(self, idtable_path):
