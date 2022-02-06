@@ -260,7 +260,7 @@ class DownstreamExpert(nn.Module):
 
         # logging Utterance-level MSE, LCC, SRCC
 
-        if mode == "dev" or mode == "test":
+        if mode == "dev":
             # some evaluation-only processing, eg. decoding
             all_pred_scores = records["pred_scores"]
             all_true_scores = records["true_scores"]
@@ -330,16 +330,24 @@ class DownstreamExpert(nn.Module):
         # save model
         if mode == "dev":
             if avg_total_loss < self.best_scores["dev_MSE"]:
-                self.best_scores[mode] = avg_total_loss
-                save_names.append(f"{mode}-best.ckpt")
+                self.best_scores["dev_MSE"] = avg_total_loss
+                save_names.append(f"{mode}-MSE-best.ckpt")
+                df = pd.DataFrame(list(zip(records["wav_names"], np.array(records["pred_scores"]))))
+                df.to_csv(Path(self.expdir, "MSE-best-answer.txt"), header=None, index=None)
+                tqdm.write(f"writing answer.txt")
+
             if pearson_rho > self.best_scores["dev_LCC"]:
                 self.best_scores["dev_LCC"] = pearson_rho
                 save_names.append(f"{mode}-LCC-best.ckpt")
+                df = pd.DataFrame(list(zip(records["wav_names"], np.array(records["pred_scores"]))))
+                df.to_csv(Path(self.expdir, "LCC-best-answer.txt"), header=None, index=None)
+                tqdm.write(f"writing answer.txt")
+
             if spearman_rho > self.best_scores["dev_SRCC"]:
                 self.best_scores["dev_SRCC"] = spearman_rho
                 save_names.append(f"{mode}-SRCC-best.ckpt")
                 df = pd.DataFrame(list(zip(records["wav_names"], np.array(records["pred_scores"]))))
-                df.to_csv(Path(self.expdir, "answer.txt"), header=None, index=None)
+                df.to_csv(Path(self.expdir, "SRCC-best-answer.txt"), header=None, index=None)
                 tqdm.write(f"writing answer.txt")
 
         if mode == "test":

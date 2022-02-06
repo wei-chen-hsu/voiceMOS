@@ -28,7 +28,7 @@ downstream_expert:
     voiceMOS_path: /home/raytz/Disk/voiceMOS/phase1-main/DATA
 
   modelrc:
-    projector_dim: 256
+    projector_dim: 768
     clipping: True # If true, the model output will be restrict to the interval [1,5] using Tanh
     attention_pooling: True
     segment_weight: 1
