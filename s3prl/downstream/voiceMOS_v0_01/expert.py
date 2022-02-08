@@ -183,7 +183,7 @@ class DownstreamExpert(nn.Module):
 
                 if self.modelrc["num_listener"] is not None:
                     discretize_list = np.arange(1,5, 1./self.modelrc["num_listener"])
-                    uttr_score = min(discretize_list, key=lambda x:abs(x-uttr_score))
+                    uttr_score = torch.min(discretize_list, key=lambda x:torch.abs(x-uttr_score))
 
                 uttr_scores.append(uttr_score.detach().cpu())
                 segments_loss += self.objective(current_segment_scores, mos_list[i])
