@@ -33,9 +33,9 @@ class VoiceMOSDataset(Dataset):
         wav_path = self.base_path / "wav" / wav_name
         
         # Data Augmentation
-        speed = 0.95 + 0.1 * random.randn()
-        pad = 0.5 * random.randn()
-        trim = -0.5 * random.randn()
+        speed = 0.95 + 0.1 * random.random()
+        pad = 0.5 * random.random()
+        trim = -0.5 * random.random()
 
         wav, _ = apply_effects_file(
             str(wav_path),
