@@ -180,6 +180,11 @@ class DownstreamExpert(nn.Module):
                     prefix_sums[i] : prefix_sums[i + 1]
                 ]
                 uttr_score = current_segment_scores.mean(dim=-1)
+
+                if self.modelrc["num_listener"] is not None:
+                    discretize_list = np.arange(1,5, 1./self.modelrc["num_listener"])
+                    uttr_score = min(discretize_list, key=lambda x:abs(x-uttr_score))
+
                 uttr_scores.append(uttr_score.detach().cpu())
                 segments_loss += self.objective(current_segment_scores, mos_list[i])
                 uttr_loss += self.objective(uttr_score, mos_list[i])

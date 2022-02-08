@@ -33,3 +33,4 @@ downstream_expert:
     attention_pooling: True
     segment_weight: 1
     bias_weight: 1
+    num_listener: 8
