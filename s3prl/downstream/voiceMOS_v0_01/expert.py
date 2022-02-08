@@ -182,8 +182,9 @@ class DownstreamExpert(nn.Module):
                 uttr_score = current_segment_scores.mean(dim=-1)
 
                 if self.modelrc["num_listener"] is not None:
-                    discretize_list = np.arange(1,5, 1./self.modelrc["num_listener"])
-                    uttr_score = torch.min(discretize_list, key=lambda x:torch.abs(x-uttr_score))
+                    discretize_list = torch.arange(1,5, 1./self.modelrc["num_listener"]).to(uttr_score.device)
+                    idx = torch.abs(discretize_list - uttr_score).argmin()
+                    uttr_score = discretize_list[idx]
 
                 uttr_scores.append(uttr_score.detach().cpu())
                 segments_loss += self.objective(current_segment_scores, mos_list[i])
