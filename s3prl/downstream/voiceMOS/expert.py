@@ -149,7 +149,7 @@ class DownstreamExpert(nn.Module):
                 bias_scores.append(bias_score.detach().cpu())
                 segments_loss += self.objective(current_segment_scores, mos_list[i])
                 uttr_loss += self.objective(uttr_score, mos_list[i])
-                bias_loss += self.objective(bias_score, mos_list[i])
+                bias_loss += self.objective(bias_score, opinion_score_list[i])
             segments_loss /= len(prefix_sums) - 1
             uttr_loss /= len(prefix_sums) - 1
             bias_loss /= len(prefix_sums) - 1
