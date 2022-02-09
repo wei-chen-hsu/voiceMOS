@@ -35,11 +35,11 @@ class SelfAttentionPooling(nn.Module):
 class Model(nn.Module):
     def __init__(self, input_dim, clipping=False, attention_pooling=False, num_judges=5000, **kwargs):
         super(Model, self).__init__()
-        self.mean_net_linear = nn.Linear(64, 1)
+        self.mean_net_linear = nn.Linear(input_dim, 1)
         self.mean_net_clipping = clipping
         self.mean_net_pooling = SelfAttentionPooling(input_dim) if attention_pooling else None
         
-        self.bias_net_linear = nn.Linear(64, 1)
+        self.bias_net_linear = nn.Linear(input_dim, 1)
         self.bias_net_pooling = SelfAttentionPooling(input_dim) if attention_pooling else None
         self.judge_embbeding = nn.Embedding(num_embeddings = num_judges, embedding_dim=input_dim)
 
