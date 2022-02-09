@@ -144,6 +144,12 @@ class DownstreamExpert(nn.Module):
                     prefix_sums[i] : prefix_sums[i + 1]
                 ]
                 uttr_score = current_segment_scores.mean(dim=-1)
+                
+                if self.modelrc["train_num_listener"] is not None:
+                    discretize_list = torch.arange(1,5, 1./self.modelrc["train_num_listener"]).to(uttr_score.device)
+                    idx = torch.abs(discretize_list - uttr_score).argmin()
+                    uttr_score = discretize_list[idx]
+
                 uttr_scores.append(uttr_score.detach().cpu())
                 bias_score = current_bias_scores.mean(dim=-1)
                 bias_scores.append(bias_score.detach().cpu())
@@ -181,8 +187,8 @@ class DownstreamExpert(nn.Module):
                 ]
                 uttr_score = current_segment_scores.mean(dim=-1)
 
-                if self.modelrc["num_listener"] is not None:
-                    discretize_list = torch.arange(1,5, 1./self.modelrc["num_listener"]).to(uttr_score.device)
+                if self.modelrc["eval_num_listener"] is not None:
+                    discretize_list = torch.arange(1,5, 1./self.modelrc["eval_num_listener"]).to(uttr_score.device)
                     idx = torch.abs(discretize_list - uttr_score).argmin()
                     uttr_score = discretize_list[idx]
 

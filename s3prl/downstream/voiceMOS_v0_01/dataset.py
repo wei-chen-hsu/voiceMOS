@@ -25,34 +25,55 @@ class VoiceMOSDataset(Dataset):
                 self.gen_idtable(idtable) 
 
     def __len__(self):
-        return len(self.dataframe)
+        if self.valid:
+            return len(self.mos_list)
+        else:
+            return len(self.dataframe)
 
     def __getitem__(self, idx):
-        system_name, wav_name, opinion_score, _, judge_id = self.dataframe.loc[idx]
-        mos = self.mos_list[self.mos_list[0]==wav_name][1].values[0]
-        wav_path = self.base_path / "wav" / wav_name
-        
-        # Data Augmentation
-        speed = 0.95 + 0.1 * random.random()
-        pad = 0.5 * random.random()
-        trim = -0.5 * random.random()
+        if self.valid:
+            wav_name, mos = self.mos_list.loc[idx]
+            wav_path = self.base_path / "wav" / wav_name
+            wav, _ = apply_effects_file(
+                str(wav_path),
+                [
+                    ["channels", "1"],
+                    ["rate", "16000"],
+                    ["norm"],
+                ],
+            )
+            wav = wav.view(-1)
+            wav_segments = unfold_segments(wav, self.segments_durations)
+            system_name = wav_name.split("-")[0]
 
-        wav, _ = apply_effects_file(
-            str(wav_path),
-            [
-                ["channels", "1"],
-                ["rate", "16000"],
-                ["speed", f'{speed:.5f}'],
-                ["pad", '0', f'{pad:.5f}'],
-                ["trim", '0', f'{trim:.5f}'],
-                ["norm"],
-            ],
-        )
+            return system_name, wav_segments, None, mos, None, wav_name
 
-        wav = wav.view(-1)
-        wav_segments = unfold_segments(wav, self.segments_durations)
+        else:
+            system_name, wav_name, opinion_score, _, judge_id = self.dataframe.loc[idx]
+            mos = self.mos_list[self.mos_list[0]==wav_name][1].values[0]
+            wav_path = self.base_path / "wav" / wav_name
+            
+            # Data Augmentation
+            speed = 0.95 + 0.1 * random.random()
+            pad = 0.5 * random.random()
+            trim = -0.5 * random.random()
 
-        return system_name, wav_segments, opinion_score, mos, judge_id, wav_name
+            wav, _ = apply_effects_file(
+                str(wav_path),
+                [
+                    ["channels", "1"],
+                    ["rate", "16000"],
+                    ["speed", f'{speed:.5f}'],
+                    ["pad", '0', f'{pad:.5f}'],
+                    ["trim", '0', f'{trim:.5f}'],
+                    ["norm"],
+                ],
+            )
+
+            wav = wav.view(-1)
+            wav_segments = unfold_segments(wav, self.segments_durations)
+
+            return system_name, wav_segments, opinion_score, mos, judge_id, wav_name
 
     def collate_fn(self, samples):
         system_name_list, wav_segments_list, opinion_score_list, mos_list, judge_id_list, wav_name_list = zip(*samples)
@@ -69,7 +90,7 @@ class VoiceMOSDataset(Dataset):
                 torch.stack(flattened_wavs_segments),
                 system_name_list,
                 prefix_sums,
-                torch.FloatTensor(opinion_score_list),
+                None,
                 torch.FloatTensor(mos_list),
                 None,
                 wav_name_list
