@@ -37,7 +37,7 @@ class Model(nn.Module):
     def __init__(self, input_dim, pooling_name, **kwargs):
         super(Model, self).__init__()
         self.linear = nn.Linear(input_dim, 1)
-        self.pooling = eval(pooling_name)(input_dim=input_dim)
+        self.pooling = eval(pooling_name)(input_dim=input_dim, activation='ReLU')
 
     def forward(self, features, features_len):
         features, _ = self.pooling(features, features_len)
