@@ -12,18 +12,19 @@ import pdb
 def generate_perturbation():
     perturb_list = ['speed_up', 'speed_down', 'trim', 'pad']
     perturb_type = random.choice(perturb_list)
+    rng = random.choice(np.linspace(0,1,101))
     
     if perturb_type == 'speed_up':
-        ratio = 1.0 + 0.05 * random.random()
+        ratio = 1.0 + 0.05 * rng
         return ['speed', f'{ratio}']
     elif perturb_type == 'speed_down':
-        ratio = 1.0 - 0.05 * random.random()
+        ratio = 1.0 - 0.05 * rng
         return ['speed', f'{ratio}']
-    elif perturb_type == 'trim':
-        ratio = -0.5 * random.random()
+    elif perturb_type == 'trim': 
+        ratio = -0.5 * rng
         return ['trim', '0', f'{ratio}']
     else:
-        ratio = 0.5 * random.random()
+        ratio = 0.5 * rng
         return ['pad', '0', f'{ratio}']
 
 class VoiceMOSDataset(Dataset):
