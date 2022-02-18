@@ -74,11 +74,11 @@ class VoiceMOSDataset(Dataset):
     def __len__(self):
         if self.valid:
             return len(self.mos_list)
-        return len(self.mos_list) + len(self.ld_score_list)
+        return 2 * len(self.ld_score_list)
 
     def __getitem__(self, idx):
-        if idx < len(self.mos_list):
-            wav_name, mos = self.mos_list.loc[idx]
+        if idx < len(self.ld_score_list):
+            wav_name, mos = self.mos_list.loc[idx % len(self.mos_list)]
 
             wav_ld_score_list = list(self.ld_score_list[self.ld_score_list[1] == wav_name][2])
             wav_ld_score_index_list = [self.class2index[score] for score in wav_ld_score_list]
