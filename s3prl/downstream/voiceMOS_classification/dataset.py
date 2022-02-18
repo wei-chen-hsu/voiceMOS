@@ -91,7 +91,7 @@ class VoiceMOSDataset(Dataset):
             judge_id = 0
 
         else:
-            index = idx - len(self.mos_list)
+            index = idx - len(self.ld_score_list)
             system_name, wav_name, opinion_score, _, judge_id = self.ld_score_list.loc[index]
             
             prob = np.zeros(self.class_num)
