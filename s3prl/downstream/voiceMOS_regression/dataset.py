@@ -10,10 +10,11 @@ from itertools import accumulate
 
 import pdb
 
-PERTURBATION={'speed_up': (lambda x: ['speed', f"{1.0 + x}"]),
-             'speed_down': (lambda x: ['speed', f"{1.0 - x}"]), 
+PERTURBATION={'speed': (lambda x: ['speed', f"{x}"]),
              'trim': (lambda x: ['trim', "0", f"{-x}"]), 
-             'pad': (lambda x: ['pad', "0", f"{x}"])
+             'pad': (lambda x: ['pad', "0", f"{x}"]),
+             'tempo': (lambda x: ['tempo', f"{x}"]),
+             'pitch': (lambda x: ['pitch', f"{x}"]),
              }
 
 PERTURBATION_MODE=['none', 'fixed', 'random']

@@ -34,8 +34,8 @@ downstream_expert:
     test_mos_list_path: sets/val_mos_list.txt
     perturb:
       mode: 'fixed'
-      types: ['speed_up', 'speed_down', 'trim', 'pad']               # ['speed_up', 'speed_down', 'trim', 'pad']
-      ratios: [0.1, 0.1, 1, 1]              # 
+      types: ['speed', 'speed', 'pitch', 'pitch', 'tempo', 'tempo']               # ['speed', 'trim', 'pad', 'pitch', 'tempo']
+      ratios: [0.95, 1.05, 100, -100, 0.95, 1.05]              # 
 
   modelrc:
     projector_dim: 768
