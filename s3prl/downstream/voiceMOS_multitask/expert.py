@@ -363,7 +363,7 @@ class DownstreamExpert(nn.Module):
                                 self.best_scores[corpus_name][metric] = all_system_metric[corpus_name][metric]
                                 save_names.append(f"{mode}-{corpus_name}-{metric}-best.ckpt")
                                 df = pd.DataFrame(list(zip(all_wav_name_list, all_pred_score_list)))
-                                df.to_csv(Path(self.expdir, f"{record_name}-{mode}-{corpus_name}-{metric}-best-answer.txt"), header=None, index=None)
+                                df.to_csv(Path(self.expdir, f"{record_name}-{mode}-{corpus_name}-{metric}-best-answer-steps-{global_step}.txt"), header=None, index=None)
 
                 if mode == "test":
                     df = pd.DataFrame(list(zip(all_wav_name_list, all_pred_score_list)))
