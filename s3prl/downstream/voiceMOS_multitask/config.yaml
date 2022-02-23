@@ -33,17 +33,20 @@ downstream_expert:
     train_ld_score_list_path: sets/TRAINSET
     val_mos_list_path: sets/val_mos_list.txt
     val_ld_score_list_path: sets/DEVSET
-    test_mos_list_path: sets/test_mos_list.txt
+    test_mos_list_path: sets/val_mos_list.txt
+    ld_score_bool: False
     idtable: ""
     perturb:
-      mode: 'fixed'
+      mode: 'random'
       types: ['speed', 'speed', 'pitch', 'pitch', 'tempo', 'tempo']               # ['speed', 'trim', 'pad', 'pitch', 'tempo']
       ratios: [0.95, 1.05, 100, -100, 0.95, 1.05]              # 
 
   modelrc:
     projector_dim: 768
-    objective: L1Loss
-    dim: [256, 128]
+    regression_objective: MSELoss
+    dim: [256, 256]
     dropout: [0, 0]
     activation: ReLU
     pooling_name: AttentivePooling
+    classification_weight: 0
+    regression_weight: 1
