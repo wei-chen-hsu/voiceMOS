@@ -33,12 +33,9 @@ def generate_apply_effect_file_commands(length, perturb_type='none', perturb_rat
         return apply_effect_file_list
 
     assert perturb_type in list(PERTURBATION.keys()), "Invalid perturbation type."
-    
-    x_range = np.linspace(0,perturb_ratio,101)
 
     for i in range(length):
-        x = random.choice(x_range)
-        perturb = PERTURBATION[perturb_type](x)
+        perturb = PERTURBATION[perturb_type](perturb_ratio)
 
         apply_effect_file_list.append([
             ["channels", "1"],
@@ -68,6 +65,8 @@ class VoiceMOSDataset(Dataset):
             for perturb_type, perturb_ratio in zip(self.perturb_types, self.perturb_ratios):
                 self.apply_effect_file_list += generate_apply_effect_file_commands(len(self.mos_list), perturb_type=perturb_type, perturb_ratio=perturb_ratio)
 
+        print(f"[Dataset Information] - MOS Score dataset \'{corpus_name}\' using perturbation type \'{perturb_mode}\'. Dataset length={len(self.apply_effect_file_list)}")
+
     def __len__(self):
         return len(self.apply_effect_file_list)
 
@@ -78,7 +77,7 @@ class VoiceMOSDataset(Dataset):
 
         if self.perturb_mode == 'random':
             perturb_type, perturb_ratio = random.choice(list(zip(self.perturb_types, self.perturb_ratios)))
-            effects = generate_apply_effect_file_commands(1, perturb_type=perturb_type, pertrub_ratio=pertrub_ratio)[0]
+            effects = generate_apply_effect_file_commands(1, perturb_type=perturb_type, perturb_ratio=perturb_ratio)[0]
 
         wav, _ = apply_effects_file(
             str(wav_path),

@@ -5,15 +5,17 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 from scipy.stats import pearsonr, spearmanr
+from sklearn.utils import class_weight
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from torch.distributed import is_initialized
 from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import DataLoader, DistributedSampler, ConcatDataset
 from tqdm import tqdm
 import pdb
 
-from .dataset import VoiceMOSDataset
+from .dataset import VoiceMOSDataset, VoiceMOSLDScoreDataset
 from .model import Model
 
 warnings.filterwarnings("ignore")
@@ -21,6 +23,9 @@ warnings.filterwarnings("ignore")
 TRUE_SCORE_IDX=0
 PRED_SCORE_IDX=1
 WAV_NAME_IDX=2
+
+JUDGE=4
+SCORE=2
 
 
 class DownstreamExpert(nn.Module):
@@ -30,6 +35,21 @@ class DownstreamExpert(nn.Module):
         self.datarc = downstream_expert["datarc"]
         self.modelrc = downstream_expert["modelrc"]
         self.expdir = kwargs["expdir"]
+
+
+        if Path(kwargs["expdir"], "idtable.pkl").is_file():
+            idtable_path = str(Path(kwargs["expdir"], "idtable.pkl"))
+            print(f"[Dataset Information] - Found existing idtable at {idtable_path}")
+            self.idtable = Path(idtable_path)
+        elif Path(self.datarc['idtable']).is_file():
+            print(f"[Dataset Information] - Found existing idtable at {self.datarc['idtable']}")
+            self.idtable = Path(self.datarc['idtable'])
+        else:
+            print(f"[Dataset Information] - Generate new idtable")
+            self.idtable = Path(kwargs["expdir"]) / "idtable.pkl"
+            self.gen_idtable(self.idtable)
+
+        # Generate or load idtable
 
         self.train_dataset = []
         self.dev_dataset = []
@@ -43,33 +63,50 @@ class DownstreamExpert(nn.Module):
             perturbrc = self.datarc['perturb']
 
             print(f"[Dataset Information] - [Train split]")
-            train_df = load_file(data_folder, self.datarc["train_mos_list_path"])
+            train_mos_df = load_file(data_folder, self.datarc["train_mos_list_path"])
+            train_ld_score_df = load_file(data_folder, self.datarc["train_ld_score_list_path"])
             train_wav_folder = Path(data_folder) / 'wav'
+            train_mos_length = len(train_ld_score_df)
 
-            self.train_dataset.append(VoiceMOSDataset(mos_list=train_df, 
+            self.train_dataset.append(VoiceMOSDataset(mos_list=train_mos_df, 
+                                                    ld_score_list=train_ld_score_df,
                                                     wav_folder=train_wav_folder, 
                                                     corpus_name=corpus_name, 
                                                     perturb_mode=perturbrc["mode"], 
                                                     perturb_types=perturbrc["types"], 
-                                                    perturb_ratios=perturbrc["ratios"]
+                                                    perturb_ratios=perturbrc["ratios"],
+                                                    total_length=train_mos_length
+                                                    ))
+
+            self.train_dataset.append(VoiceMOSLDScoreDataset(ld_score_list=train_ld_score_df, 
+                                                    wav_folder=train_wav_folder, 
+                                                    corpus_name=corpus_name, 
+                                                    perturb_mode=perturbrc["mode"], 
+                                                    perturb_types=perturbrc["types"], 
+                                                    perturb_ratios=perturbrc["ratios"],
+                                                    idtable=self.idtable
                                                     ))
 
             print(f"[Dataset Information] - [Valid split]")
-            valid_df = load_file(data_folder, self.datarc["val_mos_list_path"])
+            valid_mos_df = load_file(data_folder, self.datarc["val_mos_list_path"])
+            valid_ld_score_df = load_file(data_folder, self.datarc["val_ld_score_list_path"])
             valid_wav_folder = Path(data_folder) / 'wav'
 
-            self.dev_dataset.append(VoiceMOSDataset(mos_list=valid_df, 
+            self.dev_dataset.append(VoiceMOSDataset(mos_list=valid_mos_df, 
+                                                    ld_score_list=valid_ld_score_df,
                                                     wav_folder=valid_wav_folder, 
                                                     corpus_name=corpus_name, 
                                                     ))
 
             print(f"[Dataset Information] - [Test split]")
-            test_df = load_file(data_folder, self.datarc["test_mos_list_path"])
+            test_mos_df = load_file(data_folder, self.datarc["test_mos_list_path"])
             test_wav_folder = self.datarc['test_wav_folders'][i] if (len(self.datarc['test_wav_folders']) == len(self.datarc['data_folders'])) else (Path(data_folder) / 'wav')
 
-            self.test_dataset.append(VoiceMOSDataset(mos_list=test_df, 
+            self.test_dataset.append(VoiceMOSDataset(mos_list=test_mos_df, 
+                                                    ld_score_list=None,
                                                     wav_folder=test_wav_folder, 
                                                     corpus_name=corpus_name, 
+                                                    valid=True
                                                     ))
 
             self.system_mos[corpus_name] = pd.read_csv(Path(data_folder, "system_level_mos.csv"), index_col=False)
@@ -84,7 +121,7 @@ class DownstreamExpert(nn.Module):
         self.connector = nn.Linear(upstream_dim, self.modelrc["projector_dim"])
         self.model = Model(
             input_size=self.modelrc["projector_dim"],
-            output_size=1,
+            output_size=5,
             pooling_name=self.modelrc["pooling_name"],
             dim=self.modelrc["dim"],
             dropout=self.modelrc["dropout"],
@@ -94,8 +131,29 @@ class DownstreamExpert(nn.Module):
         print('[Model Information] - Printing downstream model information')
         print(self.model)
 
-        objective = self.modelrc["objective"]
-        self.objective = eval(f"nn.{objective}")()
+        scores = []
+        for data_folder in self.datarc['data_folders']:
+            ld_score_list = load_file(data_folder, self.datarc["train_ld_score_list_path"])
+            scores += list(ld_score_list[SCORE])
+
+        class_weights = self.calc_class_weight(scores)
+        self.objective = nn.CrossEntropyLoss(weight=torch.FloatTensor(class_weights))
+
+    def gen_idtable(self, idtable_path):
+        idtable = {}
+        count = 1
+        for data_folder in self.datarc['data_folders']:
+            ld_score_list = load_file(data_folder, self.datarc["train_ld_score_list_path"])
+            for i, judge_i in enumerate(ld_score_list[JUDGE]):
+                if judge_i not in idtable.keys():
+                    idtable[judge_i] = count
+                    count += 1
+
+        torch.save(idtable, idtable_path)
+    
+    def calc_class_weight(self, scores):
+        class_weights = class_weight.compute_class_weight('balanced', classes=np.linspace(1,5,5),y=np.array(scores))
+        return class_weights
 
     # Interface
     def get_dataloader(self, mode):
@@ -137,6 +195,8 @@ class DownstreamExpert(nn.Module):
         wav_name_list,
         corpus_name_list,
         mos_list,
+        prob_list,
+        judge_id_list,
         records,
         **kwargs,
     ):
@@ -148,19 +208,23 @@ class DownstreamExpert(nn.Module):
         features = pad_sequence(features, batch_first=True)
         features = self.connector(features)
 
-        uttr_scores = self.model(features, features_len)
+        prob_list = torch.FloatTensor(prob_list).to(features.device)
+        judge_id_list = torch.LongTensor(judge_id_list).to(features.device)
 
-        mos_list = torch.FloatTensor(mos_list).to(features.device)
-        loss = self.objective(uttr_scores, mos_list)
+        logits = self.model(features, features_len, judge_id_list)
+        if mode == "train" or mode == "dev":
+            loss = self.objective(logits, prob_list)
+            records["utterance loss"].append(loss.item())
 
-        records["utterance loss"].append(loss.item())
+        uttr_scores = torch.matmul(F.softmax(logits, dim=1), torch.linspace(1,5,5).to(logits.device))
+        true_scores = torch.matmul(prob_list, torch.linspace(1,5,5).to(prob_list.device))
 
         if mode == "dev" or mode == "test":
             if len(records["all_score"]) == 0:
                 for _ in range(3):
                     records["all_score"].append(defaultdict(lambda: defaultdict(list)))
 
-            for corpus_name, system_name, wav_name, uttr_score, mos in zip(corpus_name_list, system_name_list, wav_name_list, uttr_scores.detach().cpu().tolist(), mos_list.detach().cpu().tolist()):
+            for corpus_name, system_name, wav_name, uttr_score, mos in zip(corpus_name_list, system_name_list, wav_name_list, uttr_scores.detach().cpu().tolist(), mos_list):
                 records["all_score"][PRED_SCORE_IDX][corpus_name][system_name].append(uttr_score)
                 records["all_score"][TRUE_SCORE_IDX][corpus_name][system_name].append(mos)
                 records["all_score"][WAV_NAME_IDX][corpus_name][system_name].append(wav_name)
