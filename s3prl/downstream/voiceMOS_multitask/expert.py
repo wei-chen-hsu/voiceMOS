@@ -239,16 +239,15 @@ class DownstreamExpert(nn.Module):
         mean_scores = (np.array(class_scores) + np.array(reg_scores)) / 2
         mos_list = mos_list.detach().cpu().tolist()
 
-        if mode == "dev" or mode == "test":
-            for record_name, score_list in zip(['mean_score', 'reg_score', 'class_score'], [mean_scores, reg_scores, class_scores]):
-                if len(records[record_name]) == 0:
-                    for _ in range(3):
-                        records[record_name].append(defaultdict(lambda: defaultdict(list)))
+        for record_name, score_list in zip(['mean_score', 'reg_score', 'class_score'], [mean_scores, reg_scores, class_scores]):
+            if len(records[record_name]) == 0:
+                for _ in range(3):
+                    records[record_name].append(defaultdict(lambda: defaultdict(list)))
 
-                for corpus_name, system_name, wav_name, score, mos in zip(corpus_name_list, system_name_list, wav_name_list, score_list, mos_list):
-                    records[record_name][PRED_SCORE_IDX][corpus_name][system_name].append(score)
-                    records[record_name][TRUE_SCORE_IDX][corpus_name][system_name].append(mos)
-                    records[record_name][WAV_NAME_IDX][corpus_name][system_name].append(wav_name)
+            for corpus_name, system_name, wav_name, score, mos in zip(corpus_name_list, system_name_list, wav_name_list, score_list, mos_list):
+                records[record_name][PRED_SCORE_IDX][corpus_name][system_name].append(score)
+                records[record_name][TRUE_SCORE_IDX][corpus_name][system_name].append(mos)
+                records[record_name][WAV_NAME_IDX][corpus_name][system_name].append(wav_name)
 
         if mode == "train":
             return loss
@@ -287,7 +286,7 @@ class DownstreamExpert(nn.Module):
 
         # logging Utterance-level MSE, LCC, SRCC
 
-        if mode == "dev":
+        if mode == "train" or mode == "dev":
             # some evaluation-only processing, eg. decoding
             for record_name in ['mean_score', 'reg_score', 'class_score']:
                 all_system_metric = defaultdict(lambda: defaultdict(float))
