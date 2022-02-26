@@ -52,6 +52,7 @@ class DownstreamExpert(nn.Module):
         # Generate or load idtable
 
         self.train_dataset = []
+        self.train_eval_dataset = []
         self.dev_dataset = []
         self.test_dataset = []
         self.system_mos = {}
@@ -87,6 +88,12 @@ class DownstreamExpert(nn.Module):
                                                         perturb_ratios=perturbrc["ratios"],
                                                         idtable=self.idtable
                                                         ))
+
+            self.train_eval_dataset.append(VoiceMOSDataset(mos_list=train_mos_df, 
+                                                    ld_score_list=train_ld_score_df,
+                                                    wav_folder=train_wav_folder, 
+                                                    corpus_name=corpus_name, 
+                                                    ))
 
             print(f"[Dataset Information] - [Valid split]")
             valid_mos_df = load_file(data_folder, self.datarc["val_mos_list_path"])
@@ -167,6 +174,8 @@ class DownstreamExpert(nn.Module):
     def get_dataloader(self, mode):
         if mode == "train":
             return self._get_train_dataloader(ConcatDataset(self.train_dataset))
+        elif mode == "train_eval":
+            return self._get_eval_dataloader(ConcatDataset(self.train_eval_dataset))
         elif mode == "dev":
             return self._get_eval_dataloader(ConcatDataset(self.dev_dataset))
         elif mode == "test":
@@ -286,7 +295,7 @@ class DownstreamExpert(nn.Module):
 
         # logging Utterance-level MSE, LCC, SRCC
 
-        if mode == "train" or mode == "dev":
+        if mode == "train_eval" or mode == "dev":
             # some evaluation-only processing, eg. decoding
             for record_name in ['mean_score', 'reg_score', 'class_score']:
                 all_system_metric = defaultdict(lambda: defaultdict(float))
@@ -345,7 +354,7 @@ class DownstreamExpert(nn.Module):
 
                         tqdm.write(f"[{record_name}] [{corpus_name}] [{mode}] System-level {metric}  = {eval(metric):.4f}")
 
-        if mode == "dev" or mode == "test":
+        if mode == "dev" or mode == "test" or mode == "train_eval":
             for record_name in ['mean_score', 'reg_score', 'class_score']:
                 all_pred_score_list = []
                 all_wav_name_list = []
@@ -364,7 +373,7 @@ class DownstreamExpert(nn.Module):
                                 df = pd.DataFrame(list(zip(all_wav_name_list, all_pred_score_list)))
                                 df.to_csv(Path(self.expdir, f"{record_name}-{mode}-{corpus_name}-{metric}-best-answer-steps-{global_step}.txt"), header=None, index=None)
 
-                if mode == "test":
+                if mode == "test" or mode == "train_eval":
                     df = pd.DataFrame(list(zip(all_wav_name_list, all_pred_score_list)))
                     df.to_csv(Path(self.expdir, f"{record_name}-{mode}-steps-{global_step}-answer.txt"), header=None, index=None)
 
