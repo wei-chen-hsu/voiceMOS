@@ -57,6 +57,7 @@ class DownstreamExpert(nn.Module):
         self.test_dataset = []
         self.system_mos = {}
         self.best_scores = {}
+        self.record_names = ['mean_score', 'reg_score', 'class_score']
 
         print(f"[Dataset Information] - Using dataset {self.datarc['corpus_names']}")
 
@@ -248,7 +249,7 @@ class DownstreamExpert(nn.Module):
         mean_scores = (np.array(class_scores) + np.array(reg_scores)) / 2
         mos_list = mos_list.detach().cpu().tolist()
 
-        for record_name, score_list in zip(['mean_score', 'reg_score', 'class_score'], [mean_scores, reg_scores, class_scores]):
+        for record_name, score_list in zip(self.record_names, [mean_scores, reg_scores, class_scores]):
             if len(records[record_name]) == 0:
                 for _ in range(3):
                     records[record_name].append(defaultdict(lambda: defaultdict(list)))
@@ -274,21 +275,21 @@ class DownstreamExpert(nn.Module):
         if mode == "train" or mode == "dev":
             avg_total_loss = np.mean(records["total loss"])
             logger.add_scalar(
-                f"Total loss/{mode}",
+                f"Total-loss/{mode}",
                 avg_total_loss,
                 global_step=global_step,
             )
 
             avg_reg_loss = np.mean(records["regression loss"])
             logger.add_scalar(
-                f"Regression loss/{mode}",
+                f"Regression-loss/{mode}",
                 avg_reg_loss,
                 global_step=global_step,
             )
 
             avg_class_loss = np.mean(records["classification loss"])
             logger.add_scalar(
-                f"Classification loss/{mode}",
+                f"Classification-loss/{mode}",
                 avg_class_loss,
                 global_step=global_step,
             )
@@ -297,8 +298,8 @@ class DownstreamExpert(nn.Module):
 
         if mode == "train_eval" or mode == "dev":
             # some evaluation-only processing, eg. decoding
-            for record_name in ['mean_score', 'reg_score', 'class_score']:
-                all_system_metric = defaultdict(lambda: defaultdict(float))
+            for record_name in self.record_names:
+                all_system_metric = defaultdict(lambda: defaultdict(lambda: defaultdict(float)))
 
                 for corpus_name in self.datarc['corpus_names']:
                     corpus_pred_score_list = []
@@ -325,12 +326,12 @@ class DownstreamExpert(nn.Module):
 
                     for metric in ['MSE', 'LCC', 'SRCC']:
                         logger.add_scalar(
-                            f"Utterance-level {record_name}/{corpus_name} {mode} {metric}",
+                            f"Utterance-level-{record_name}/{corpus_name}-{mode}-{metric}",
                             eval(metric),
                             global_step=global_step,
                         )
 
-                        tqdm.write(f"[{record_name}] [{corpus_name}] [{mode}] Utterance-level {metric}  = {eval(metric):.4f}")
+                        # tqdm.write(f"[{record_name}] [{corpus_name}] [{mode}] Utterance-level {metric}  = {eval(metric):.4f}")
 
 
                     # Calculate system level metric 
@@ -344,18 +345,18 @@ class DownstreamExpert(nn.Module):
                     SRCC, _ = spearmanr(corpus_system_true_scores, corpus_system_pred_scores)
 
                     for metric in ['MSE', 'LCC', 'SRCC']:
-                        all_system_metric[corpus_name][metric] = eval(metric)
+                        all_system_metric[record_name][corpus_name][metric] = eval(metric)
 
                         logger.add_scalar(
-                            f"System-level {record_name}/{corpus_name} {mode} {metric}",
+                            f"System-level-{record_name}/{corpus_name}-{mode}-{metric}",
                             eval(metric),
                             global_step=global_step,
                         )
 
-                        tqdm.write(f"[{record_name}] [{corpus_name}] [{mode}] System-level {metric}  = {eval(metric):.4f}")
+                        # tqdm.write(f"[{record_name}] [{corpus_name}] [{mode}] System-level {metric}  = {eval(metric):.4f}")
 
         if mode == "dev" or mode == "test" or mode == "train_eval":
-            for record_name in ['mean_score', 'reg_score', 'class_score']:
+            for record_name in self.record_names:
                 all_pred_score_list = []
                 all_wav_name_list = []
 
@@ -367,13 +368,14 @@ class DownstreamExpert(nn.Module):
                 if mode == "dev":
                     for corpus_name in self.datarc['corpus_names']:
                         for metric, operator in zip(['MSE', 'LCC', 'SRCC'], ["<", ">", ">"]):
-                            if eval(f"{all_system_metric[corpus_name][metric]} {operator} {self.best_scores[corpus_name][metric]}"):
-                                self.best_scores[corpus_name][metric] = all_system_metric[corpus_name][metric]
-                                save_names.append(f"{mode}-{corpus_name}-{metric}-best.ckpt")
-                                df = pd.DataFrame(list(zip(all_wav_name_list, all_pred_score_list)))
-                                df.to_csv(Path(self.expdir, f"{record_name}-{mode}-{corpus_name}-{metric}-best-answer-steps-{global_step}.txt"), header=None, index=None)
+                            if eval(f"{all_system_metric[record_name][corpus_name][metric]} {operator} {self.best_scores[corpus_name][metric]}"):
+                                tqdm.write(f"{record_name}-{corpus_name}-{metric}={all_system_metric[record_name][corpus_name][metric]:.4f} {operator} current best {corpus_name}-{metric}={self.best_scores[corpus_name][metric]:.4f}, Saving checkpoint")
 
-                if mode == "test" or mode == "train_eval":
+                                self.best_scores[corpus_name][metric] = all_system_metric[record_name][corpus_name][metric]
+                                save_names.append(f"{mode}-{corpus_name}-{metric}-best.ckpt")
+                                
+
+                if mode == "test" or mode == "train_eval" or mode == "dev":
                     df = pd.DataFrame(list(zip(all_wav_name_list, all_pred_score_list)))
                     df.to_csv(Path(self.expdir, f"{record_name}-{mode}-steps-{global_step}-answer.txt"), header=None, index=None)
 
