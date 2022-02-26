@@ -344,13 +344,14 @@ class DownstreamExpert(nn.Module):
                     SRCC, _ = spearmanr(corpus_system_true_scores, corpus_system_pred_scores)
 
                     for metric, operator in zip(['MSE', 'LCC', 'SRCC'], ["<", ">", ">"]):
-                        value = eval(metric)
-                        best_value = self.best_scores[corpus_name][metric]
-                        if eval(f"{value} {operator} {best_value}"):
-                            tqdm.write(f"{record_name}-{corpus_name}-{metric}={value:.4f} {operator} current best {corpus_name}-{metric}={best_value:.4f}, Saving checkpoint")
-                            
-                            self.best_scores[corpus_name][metric] = value
-                            save_names.append(f"{mode}-{corpus_name}-{metric}-best.ckpt")
+                        if mode == "dev":
+                            value = eval(metric)
+                            best_value = self.best_scores[corpus_name][metric]
+                            if eval(f"{value} {operator} {best_value}"):
+                                tqdm.write(f"{record_name}-{corpus_name}-{metric}={value:.4f} {operator} current best {corpus_name}-{metric}={best_value:.4f}, Saving checkpoint")
+                                
+                                self.best_scores[corpus_name][metric] = value
+                                save_names.append(f"{mode}-{corpus_name}-{metric}-best.ckpt")
 
                         logger.add_scalar(
                             f"System-level-{record_name}/{corpus_name}-{mode}-{metric}",
