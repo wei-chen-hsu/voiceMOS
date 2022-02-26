@@ -299,7 +299,6 @@ class DownstreamExpert(nn.Module):
         if mode == "train_eval" or mode == "dev":
             # some evaluation-only processing, eg. decoding
             for record_name in self.record_names:
-                all_system_metric = defaultdict(lambda: defaultdict(lambda: defaultdict(float)))
 
                 for corpus_name in self.datarc['corpus_names']:
                     corpus_pred_score_list = []
@@ -344,8 +343,14 @@ class DownstreamExpert(nn.Module):
                     LCC, _ = pearsonr(corpus_system_true_scores, corpus_system_pred_scores)
                     SRCC, _ = spearmanr(corpus_system_true_scores, corpus_system_pred_scores)
 
-                    for metric in ['MSE', 'LCC', 'SRCC']:
-                        all_system_metric[record_name][corpus_name][metric] = eval(metric)
+                    for metric, operator in zip(['MSE', 'LCC', 'SRCC'], ["<", ">", ">"]):
+                        value = eval(metric)
+                        best_value = self.best_scores[corpus_name][metric]
+                        if eval(f"{value} {operator} {best_value}"):
+                            tqdm.write(f"{record_name}-{corpus_name}-{metric}={value:.4f} {operator} current best {corpus_name}-{metric}={best_value:.4f}, Saving checkpoint")
+                            
+                            self.best_scores[corpus_name][metric] = value
+                            save_names.append(f"{mode}-{corpus_name}-{metric}-best.ckpt")
 
                         logger.add_scalar(
                             f"System-level-{record_name}/{corpus_name}-{mode}-{metric}",
@@ -365,19 +370,8 @@ class DownstreamExpert(nn.Module):
                         all_pred_score_list += records[record_name][PRED_SCORE_IDX][corpus_name][system_name]
                         all_wav_name_list += records[record_name][WAV_NAME_IDX][corpus_name][system_name]
 
-                if mode == "dev":
-                    for corpus_name in self.datarc['corpus_names']:
-                        for metric, operator in zip(['MSE', 'LCC', 'SRCC'], ["<", ">", ">"]):
-                            if eval(f"{all_system_metric[record_name][corpus_name][metric]} {operator} {self.best_scores[corpus_name][metric]}"):
-                                tqdm.write(f"{record_name}-{corpus_name}-{metric}={all_system_metric[record_name][corpus_name][metric]:.4f} {operator} current best {corpus_name}-{metric}={self.best_scores[corpus_name][metric]:.4f}, Saving checkpoint")
-
-                                self.best_scores[corpus_name][metric] = all_system_metric[record_name][corpus_name][metric]
-                                save_names.append(f"{mode}-{corpus_name}-{metric}-best.ckpt")
-                                
-
-                if mode == "test" or mode == "train_eval" or mode == "dev":
-                    df = pd.DataFrame(list(zip(all_wav_name_list, all_pred_score_list)))
-                    df.to_csv(Path(self.expdir, f"{record_name}-{mode}-steps-{global_step}-answer.txt"), header=None, index=None)
+                df = pd.DataFrame(list(zip(all_wav_name_list, all_pred_score_list)))
+                df.to_csv(Path(self.expdir, f"{record_name}-{mode}-steps-{global_step}-answer.txt"), header=None, index=None)
 
         return save_names
 
