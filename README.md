@@ -58,7 +58,7 @@ If you find this toolkit helpful to your research, please do consider citing [ou
 ## Installation
 
 1. **Python** >= 3.8
-2. **PyTorch** >= 1.10
+2. **PyTorch** >= 1.10.1
 3. Install **sox** on your OS
 4. Install s3prl
 
