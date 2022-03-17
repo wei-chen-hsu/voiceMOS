@@ -88,7 +88,7 @@ class VoiceMOSDataset(Dataset):
     def __getitem__(self, idx):
         list_idx = idx % self.total_length % len(self.mos_list)
 
-        wav_name, mos = self.mos_list.loc[list_idx] # used to locate a data in a list (supposed to be inside the module pandas?)
+        wav_name, mos = self.mos_list.loc[list_idx] # ! used to locate a data in a list (supposed to be inside the module pandas?)
         wav_path = self.wav_folder / wav_name
         effects = self.apply_effect_file_list[idx]
 
