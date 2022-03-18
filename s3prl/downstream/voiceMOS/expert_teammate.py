@@ -57,7 +57,7 @@ class DownstreamExpert(nn.Module):
         self.test_dataset = []
         self.system_mos = {}
         self.best_scores = {}
-        self.record_names = ['mean_score', 'reg_score', 'class_score']
+        self.record_names = ['mean_score', 'reg_score']
 
         print(f"[Dataset Information] - Using dataset {self.datarc['corpus_names']}")
 
@@ -146,9 +146,9 @@ class DownstreamExpert(nn.Module):
             ld_score_list = load_file(data_folder, self.datarc["train_ld_score_list_path"])
             scores += list(ld_score_list[SCORE])
 
-        """ class_weights = self.calc_class_weight(scores)
-        self.classification_objective = nn.CrossEntropyLoss(weight=torch.FloatTensor(class_weights))
-        self.classification_weight = self.modelrc['classification_weight'] """
+        # class_weights = self.calc_class_weight(scores)
+        # self.classification_objective = nn.CrossEntropyLoss(weight=torch.FloatTensor(class_weights))
+        # self.classification_weight = self.modelrc['classification_weight']
 
         self.regression_objective = eval(f"nn.{self.modelrc['regression_objective']}")()
         self.regression_weight = self.modelrc['regression_weight']
@@ -167,9 +167,9 @@ class DownstreamExpert(nn.Module):
 
         torch.save(idtable, idtable_path)
     
-    """ def calc_class_weight(self, scores):
+    def calc_class_weight(self, scores):
         class_weights = class_weight.compute_class_weight('balanced', classes=np.linspace(1,5,5),y=np.array(scores))
-        return class_weights """
+        return class_weights
 
     # Interface
     def get_dataloader(self, mode):
@@ -234,22 +234,22 @@ class DownstreamExpert(nn.Module):
 
         if mode == "train" or mode == "dev":
             reg_loss = self.regression_objective(reg_scores, mos_list)
-            class_loss = self.classification_objective(logits, prob_list)
-            loss = self.regression_weight * reg_loss + self.classification_weight * class_loss
+            # class_loss = self.classification_objective(logits, prob_list)
+            # loss = self.regression_weight * reg_loss + self.classification_weight * class_loss
 
             records["regression loss"].append(reg_loss.item())
-            records["classification loss"].append(class_loss.item())
+            # records["classification loss"].append(class_loss.item())
             records["total loss"].append(loss.item())
 
-        class_scores = torch.matmul(F.softmax(logits, dim=1), torch.linspace(1,5,5).to(logits.device))
+        # class_scores = torch.matmul(F.softmax(logits, dim=1), torch.linspace(1,5,5).to(logits.device))
         true_scores = torch.matmul(prob_list, torch.linspace(1,5,5).to(prob_list.device))
 
         reg_scores = reg_scores.detach().cpu().tolist()
-        class_scores = class_scores.detach().cpu().tolist()  
-        mean_scores = (np.array(class_scores) + np.array(reg_scores)) / 2
+        # class_scores = class_scores.detach().cpu().tolist()  
+        mean_scores = np.array(reg_scores)
         mos_list = mos_list.detach().cpu().tolist()
 
-        for record_name, score_list in zip(self.record_names, [mean_scores, reg_scores, class_scores]):
+        for record_name, score_list in zip(self.record_names, [mean_scores, reg_scores]):
             if len(records[record_name]) == 0:
                 for _ in range(3):
                     records[record_name].append(defaultdict(lambda: defaultdict(list)))
@@ -287,12 +287,12 @@ class DownstreamExpert(nn.Module):
                 global_step=global_step,
             )
 
-            avg_class_loss = np.mean(records["classification loss"])
-            logger.add_scalar(
-                f"Classification-loss/{mode}",
-                avg_class_loss,
-                global_step=global_step,
-            )
+            # avg_class_loss = np.mean(records["classification loss"])
+            # logger.add_scalar(
+            #     f"Classification-loss/{mode}",
+            #     avg_class_loss,
+            #     global_step=global_step,
+            # )
 
         # logging Utterance-level MSE, LCC, SRCC
 
